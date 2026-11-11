@@ -399,15 +399,13 @@ export const MetricValue = styled.div`
   font-weight: 730;
   letter-spacing: -0.6px;
 `;
-export const MetricChange = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 3px;
+export const MetricDetail = styled.div`
+  overflow: hidden;
   margin-top: 4px;
-  color: ${({ $direction }) => ($direction === 'up' ? '#38a77b' : '#e18476')};
+  color: #a0a2b0;
   font-size: 9px;
-  font-weight: 700;
-  .period { margin-left: 3px; color: #aaaebb; font-weight: 450; }
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 export const Panel = styled.section`
@@ -695,20 +693,40 @@ export const Badge = styled.span`
   font-size: 8px;
   font-weight: 650;
 `;
-export const Progress = styled.span`
-  display: block;
-  overflow: hidden;
-  width: 48px;
-  height: 4px;
-  border-radius: 8px;
-  background: #eeeff5;
-  span { display: block; height: 100%; border-radius: inherit; background: #8070e9; }
-`;
 export const EmptyState = styled.div`
   padding: 24px;
   color: #999cac;
   font-size: 10px;
   text-align: center;
+`;
+
+export const TableFooter = styled.div`
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #f1f2f6;
+  padding: 9px 19px;
+  color: #999cac;
+  font-size: 9px;
+  > div { display: flex; align-items: center; gap: 9px; }
+  button {
+    min-height: 27px;
+    border: 1px solid #eceef4;
+    border-radius: 6px;
+    background: #fff;
+    padding: 0 8px;
+    color: #686b80;
+    font-size: 9px;
+    cursor: pointer;
+  }
+  button:disabled { cursor: not-allowed; opacity: 0.5; }
+  @media (max-width: 520px) {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-inline: 14px;
+  }
 `;
 
 export const LoadingState = styled.div`

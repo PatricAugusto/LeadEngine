@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  ArrowDownRight,
-  ArrowUpRight,
   Bell,
   Building2,
   ChevronDown,
   CircleHelp,
   ClipboardList,
+  Database,
   LayoutDashboard,
   LoaderCircle,
   MapPin,
@@ -18,7 +17,8 @@ import {
   TrendingUp,
   Users,
 } from 'lucide-react';
-import { getDashboard } from './api.js';
+import { getDashboard, getProspects } from './api.js';
+import LeadSearch from './components/LeadSearch.jsx';
 import {
   ActivityBars,
   ActivityCard,
@@ -58,7 +58,7 @@ import {
   LoadingState,
   Main,
   MetricCard,
-  MetricChange,
+  MetricDetail,
   MetricIcon,
   MetricLabel,
   MetricGrid,
@@ -75,7 +75,6 @@ import {
   PipelineStage,
   PipelineTrack,
   PipelineValue,
-  Progress,
   RefreshButton,
   SearchWrap,
   Section,
@@ -85,6 +84,7 @@ import {
   Sidebar,
   SidebarBottom,
   SidebarLink,
+  TableFooter,
   TableHead,
   TableWrap,
   Tag,
@@ -111,9 +111,29 @@ const formatPercent = new Intl.NumberFormat('pt-BR', {
   minimumFractionDigits: 1,
   maximumFractionDigits: 1,
 });
+const avatarColors = ['#7868db', '#4f9d83', '#d38c49', '#5687ca', '#b16a8a', '#668d6f'];
+const dateFormat = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
 
-function Metric({ icon: Icon, label, value, change, tone, direction = 'up' }) {
-  const ChangeIcon = direction === 'up' ? ArrowUpRight : ArrowDownRight;
+function initials(name) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toLocaleUpperCase('pt-BR');
+}
+
+function formatCnpj(cnpj) {
+  return cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+}
+
+function Metric({ icon: Icon, label, value, detail, tone }) {
   return (
     <MetricCard>
       <MetricTopRow>
@@ -123,11 +143,7 @@ function Metric({ icon: Icon, label, value, change, tone, direction = 'up' }) {
         </MetricIcon>
       </MetricTopRow>
       <MetricValue>{value}</MetricValue>
-      <MetricChange $direction={direction}>
-        <ChangeIcon size={14} />
-        <span>{change}</span>
-        <span className="period">vs. mês passado</span>
-      </MetricChange>
+      <MetricDetail>{detail}</MetricDetail>
     </MetricCard>
   );
 }
@@ -153,32 +169,57 @@ function SidebarNavigation({ items }) {
   );
 }
 
-function ProspectTable({ prospects, search, onSearch }) {
-  const filteredProspects = useMemo(() => {
-    const term = search.trim().toLocaleLowerCase('pt-BR');
-    if (!term) return prospects;
-    return prospects.filter((prospect) =>
-      [prospect.companyName, prospect.segment, prospect.city, prospect.state]
-        .join(' ')
-        .toLocaleLowerCase('pt-BR')
-        .includes(term),
-    );
-  }, [prospects, search]);
+function ProspectTable() {
+  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQuery(search.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError('');
+    getProspects({ page, query })
+        .then((response) => {
+          if (active) setResult(response);
+        })
+        .catch((loadError) => {
+          if (active) setError(loadError.message);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    return () => { active = false; };
+  }, [page, query]);
+
+  const prospects = result?.items || [];
+  const firstItem = result?.total ? ((page - 1) * result.pageSize) + 1 : 0;
+  const lastItem = Math.min(page * (result?.pageSize || 0), result?.total || 0);
 
   return (
     <Panel>
       <PanelHeader>
         <div>
-          <PanelTitle>Leads em destaque</PanelTitle>
-          <SectionSubtitle>Empresas com maior potencial de conversão</SectionSubtitle>
+          <PanelTitle>Empresas encontradas</PanelTitle>
+          <SectionSubtitle>Empresas ativas encontradas na base oficial</SectionSubtitle>
         </div>
         <SearchWrap>
           <Search size={16} aria-hidden="true" />
           <input
             aria-label="Buscar empresa, segmento ou cidade"
-            placeholder="Buscar leads..."
+            placeholder="Buscar em toda a base..."
             value={search}
-            onChange={(event) => onSearch(event.target.value)}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(1);
+            }}
           />
         </SearchWrap>
       </PanelHeader>
@@ -187,47 +228,60 @@ function ProspectTable({ prospects, search, onSearch }) {
           <thead>
             <tr>
               <TableHead>Empresa</TableHead>
-              <TableHead>Segmento</TableHead>
+              <TableHead>Atividade (CNAE)</TableHead>
               <TableHead>Localização</TableHead>
-              <TableHead>Qualificação</TableHead>
-              <TableHead>Potencial</TableHead>
+              <TableHead>Porte</TableHead>
+              <TableHead>Abertura</TableHead>
+              <TableHead>Status</TableHead>
             </tr>
           </thead>
           <tbody>
-            {filteredProspects.map((prospect) => (
+            {prospects.map((prospect) => (
               <tr key={prospect.id}>
                 <DataCell>
                   <LeadCompany>
-                    <LeadInitial $color={prospect.color}>{prospect.initials}</LeadInitial>
+                    <LeadInitial $color={avatarColors[prospect.id.charCodeAt(0) % avatarColors.length]}>
+                      {initials(prospect.companyName)}
+                    </LeadInitial>
                     <LeadInfo>
                       <LeadName>{prospect.companyName}</LeadName>
-                      <LeadSubtext>{prospect.contact}</LeadSubtext>
+                      <LeadSubtext>CNPJ {formatCnpj(prospect.cnpj)}</LeadSubtext>
                     </LeadInfo>
                   </LeadCompany>
                 </DataCell>
-                <DataCell><Tag>{prospect.segment}</Tag></DataCell>
+                <DataCell><Tag title={`CNAE ${prospect.cnaePrimary}`}>{prospect.cnaeDescription || prospect.cnaePrimary}</Tag></DataCell>
                 <DataCell>
                   <span className="location"><MapPin size={14} />{prospect.city}, {prospect.state}</span>
                 </DataCell>
-                <DataCell><Badge $status={prospect.status}>{prospect.statusLabel}</Badge></DataCell>
                 <DataCell>
-                  <div className="score">
-                    <Progress><span style={{ width: `${prospect.score}%` }} /></Progress>
-                    <span>{prospect.score}</span>
-                  </div>
+                  <span>{prospect.companySize || 'Não informado'}</span>
                 </DataCell>
+                <DataCell>
+                  <span className="opened">{prospect.openedAt ? dateFormat.format(new Date(prospect.openedAt)) : '—'}</span>
+                </DataCell>
+                <DataCell><Badge $status={prospect.status}>{prospect.statusLabel}</Badge></DataCell>
               </tr>
             ))}
           </tbody>
         </DataTable>
-        {filteredProspects.length === 0 && (
-          <EmptyState>Nenhum lead corresponde à busca.</EmptyState>
+        {loading && <EmptyState>Carregando empresas...</EmptyState>}
+        {!loading && error && <EmptyState role="alert">{error}</EmptyState>}
+        {!loading && !error && prospects.length === 0 && (
+          <EmptyState>{query ? 'Nenhuma empresa corresponde à busca.' : 'Nenhuma empresa encontrada. Inicie uma busca por estado.'}</EmptyState>
         )}
       </TableWrap>
-      <div className="table-footer">
-        <span>Exibindo {filteredProspects.length} de {prospects.length} leads demonstrativos</span>
-        <button type="button" disabled title="Disponível em breve">Ver todos <ChevronDown size={14} /></button>
-      </div>
+      <TableFooter>
+        <span>{result ? `Exibindo ${firstItem}–${lastItem} de ${formatNumber.format(result.total)} empresas` : 'Carregando base...'}</span>
+        <div>
+          <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={loading || page <= 1}>
+            Anterior
+          </button>
+          <span>Página {page} de {result?.pageCount || 1}</span>
+          <button type="button" onClick={() => setPage((current) => current + 1)} disabled={loading || page >= (result?.pageCount || 1)}>
+            Próxima
+          </button>
+        </div>
+      </TableFooter>
     </Panel>
   );
 }
@@ -240,8 +294,8 @@ function PipelinePanel({ stages }) {
           <PanelTitle>Funil de prospecção</PanelTitle>
           <SectionSubtitle>Distribuição de leads por etapa</SectionSubtitle>
         </div>
-        <button className="period-select" type="button" disabled title="Período demonstrativo">
-          Este mês <ChevronDown size={14} />
+        <button className="period-select" type="button" disabled title="Indicadores de toda a base local">
+          Toda a base <ChevronDown size={14} />
         </button>
       </PanelHeader>
       <div className="pipeline">
@@ -255,7 +309,7 @@ function PipelinePanel({ stages }) {
       </div>
       <div className="pipeline-note">
         <Sparkles size={16} />
-        <span>Leads qualificados têm <strong>2,4× mais chance</strong> de avançar para uma reunião.</span>
+        <span>Atualize o status dos leads conforme sua equipe avança no processo comercial.</span>
       </div>
     </Panel>
   );
@@ -297,7 +351,6 @@ function ActivityPanel({ activity }) {
 
 export default function App() {
   const [dashboard, setDashboard] = useState(null);
-  const [search, setSearch] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -360,7 +413,7 @@ export default function App() {
           <Header>
             <div>
               <HeaderEyebrow>
-                {new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
+                  {new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
                   .format(new Date())
                   .toLocaleUpperCase('pt-BR')}
               </HeaderEyebrow>
@@ -374,8 +427,11 @@ export default function App() {
           </Header>
 
           <DemoNotice>
-            <Sparkles size={15} />
-            <span>Modo demonstração — os dados exibidos são fictícios e não representam empresas reais.</span>
+            <Database size={15} />
+            <span>
+              Fonte: {dashboard?.source || 'Dados Abertos do CNPJ — Receita Federal'}.
+              {' '}Somente dados cadastrais empresariais; não coletamos dados pessoais nesta etapa.
+            </span>
           </DemoNotice>
 
           {error && <ErrorBox role="alert">{error}</ErrorBox>}
@@ -390,14 +446,18 @@ export default function App() {
             <Content>
               <Section>
                 <SectionHeader>
-                  <div><SectionTitle>Seus resultados</SectionTitle><SectionSubtitle>Resumo da operação comercial</SectionSubtitle></div>
-                  <span className="updated">Atualizado agora</span>
+                  <div><SectionTitle>Base de prospecção</SectionTitle><SectionSubtitle>Empresas cadastradas e indicadores da base local</SectionSubtitle></div>
+                  <span className="updated">
+                    {dashboard.latestRun?.finishedAt
+                      ? `Base consultada em ${dateFormat.format(new Date(dashboard.latestRun.finishedAt))}`
+                      : 'Nenhuma busca concluída'}
+                  </span>
                 </SectionHeader>
                 <MetricGrid>
-                  <Metric icon={Users} label="Leads mapeados" value={formatNumber.format(dashboard.metrics.activeProspects)} change="+12,8%" tone="purple" />
-                  <Metric icon={Sparkles} label="Novos hoje" value={formatNumber.format(dashboard.metrics.newToday)} change="+8,2%" tone="blue" />
-                  <Metric icon={Target} label="Qualificados" value={formatNumber.format(dashboard.metrics.qualified)} change="+4,6%" tone="green" />
-                  <Metric icon={TrendingUp} label="Conversão" value={`${formatPercent.format(dashboard.metrics.conversion)}%`} change="-1,3%" tone="orange" direction="down" />
+                  <Metric icon={Users} label="Empresas encontradas" value={formatNumber.format(dashboard.metrics.activeProspects)} detail="CNPJs ativos na base" tone="purple" />
+                  <Metric icon={Sparkles} label="Novas hoje" value={formatNumber.format(dashboard.metrics.newToday)} detail="Incluídas desde a meia-noite" tone="blue" />
+                  <Metric icon={Target} label="Qualificadas" value={formatNumber.format(dashboard.metrics.qualified)} detail="Status salvo na base" tone="green" />
+                  <Metric icon={TrendingUp} label="Clientes" value={`${formatPercent.format(dashboard.metrics.conversion)}%`} detail={`${formatNumber.format(dashboard.metrics.customers)} clientes na base`} tone="orange" />
                 </MetricGrid>
               </Section>
 
@@ -406,8 +466,10 @@ export default function App() {
                 <PipelinePanel stages={dashboard.funnel} />
               </div>
 
+              <LeadSearch onCompleted={loadDashboard} />
+
               <Section>
-                <ProspectTable prospects={dashboard.prospects} search={search} onSearch={setSearch} />
+                <ProspectTable key={dashboard.latestRun?.finishedAt || 'initial'} />
               </Section>
               <div className="footer-note">LeadEngine · Prospecção inteligente para gestão e auditoria</div>
             </Content>
