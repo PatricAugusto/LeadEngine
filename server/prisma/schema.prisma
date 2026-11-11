@@ -1,0 +1,24 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Prospect {
+  id          String   @id @default(cuid())
+  companyName String
+  segment     String
+  city        String
+  state       String
+  contact     String?
+  score       Int      @default(0)
+  status      String   @default("new")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, score])
+  @@index([segment, state])
+}
