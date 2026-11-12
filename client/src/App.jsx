@@ -17,9 +17,15 @@ import {
   TrendingUp,
   Users,
 } from 'lucide-react';
-import { getDashboard, getProspects } from './api.js';
+import { getDashboard, getProspects, getSearchRuns } from './api.js';
 import LeadSearch from './components/LeadSearch.jsx';
 import LeadsPage from './components/LeadsPage.jsx';
+import CompaniesPage from './components/CompaniesPage.jsx';
+import CampaignsPage from './components/CampaignsPage.jsx';
+import ReportsPage from './components/ReportsPage.jsx';
+import SettingsPage from './components/SettingsPage.jsx';
+import HelpPage from './components/HelpPage.jsx';
+import { NotificationAnchor, NotificationPanel } from './components/ModuleStyles.js';
 import {
   ActivityBars,
   ActivityCard,
@@ -98,14 +104,101 @@ import {
 const navigation = [
   { label: 'Visão geral', icon: LayoutDashboard, page: 'overview' },
   { label: 'Leads', icon: Users, page: 'leads' },
-  { label: 'Empresas', icon: Building2 },
-  { label: 'Campanhas', icon: Megaphone },
+  { label: 'Empresas', icon: Building2, page: 'companies' },
+  { label: 'Campanhas', icon: Megaphone, page: 'campaigns' },
 ];
 
 const secondaryNavigation = [
-  { label: 'Relatórios', icon: ClipboardList },
-  { label: 'Configurações', icon: Settings2 },
+  { label: 'Relatórios', icon: ClipboardList, page: 'reports' },
+  { label: 'Configurações', icon: Settings2, page: 'settings' },
 ];
+
+const pageDetails = {
+  overview: { title: 'Visão geral', eyebrow: '' },
+  leads: { title: 'Leads', eyebrow: 'GESTÃO COMERCIAL' },
+  companies: { title: 'Empresas', eyebrow: 'BASE EMPRESARIAL' },
+  campaigns: { title: 'Campanhas', eyebrow: 'PLANEJAMENTO COMERCIAL' },
+  reports: { title: 'Relatórios', eyebrow: 'INDICADORES DA OPERAÇÃO' },
+  settings: { title: 'Configurações', eyebrow: 'PREFERÊNCIAS DO SISTEMA' },
+  help: { title: 'Central de ajuda', eyebrow: 'GUIA DE UTILIZAÇÃO' },
+};
+const pageSubtitles = {
+  overview: 'Encontre as melhores oportunidades para o seu time.',
+  leads: 'Organize empresas, acompanhe etapas e mantenha sua prospecção em movimento.',
+  companies: 'Pesquise e consulte os dados empresariais da base local.',
+  campaigns: 'Agrupe empresas e acompanhe o progresso comercial manualmente.',
+  reports: 'Acompanhe indicadores reais da base, campanhas e buscas.',
+  settings: 'Configure o agendamento automático de atualizações da base.',
+  help: 'Veja como usar os módulos e os limites das informações disponíveis.',
+};
+
+const runStatusLabels = {
+  queued: 'Na fila',
+  running: 'Em andamento',
+  completed: 'Concluída',
+  failed: 'Falhou',
+};
+
+function NotificationsMenu() {
+  const [open, setOpen] = useState(false);
+  const [runs, setRuns] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!open) return undefined;
+    let active = true;
+    setLoading(true);
+    setError('');
+    getSearchRuns()
+      .then((items) => { if (active) setRuns(items.slice(0, 5)); })
+      .catch((loadError) => { if (active) setError(loadError.message); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [open]);
+
+  const hasFailed = runs.some((run) => run.status === 'failed');
+  const timeFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+
+  return (
+    <NotificationAnchor>
+      <IconButton
+        type="button"
+        aria-label="Notificações de busca"
+        aria-expanded={open}
+        title="Atividade recente das buscas"
+        $failed={hasFailed}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <Bell size={18} />
+        {(hasFailed || runs.some((run) => run.status === 'running' || run.status === 'queued')) && <i />}
+      </IconButton>
+      {open && (
+        <NotificationPanel role="region" aria-label="Atividade recente das buscas" aria-live="polite">
+          <div className="header">
+            <h2 className="title">Atividade de busca</h2>
+            <button type="button" onClick={() => setOpen(false)}>Fechar</button>
+          </div>
+          {loading && <p className="empty" role="status">Carregando atividade...</p>}
+          {error && <p className="empty" role="alert">{error}</p>}
+          {!loading && !error && !runs.length && <p className="empty">Nenhuma busca registrada.</p>}
+          {!loading && !error && runs.map((run) => (
+            <div className="item" key={run.id}>
+              <strong className={run.status === 'failed' ? 'failed' : undefined}>
+                {runStatusLabels[run.status] || run.status} · {(run.states || []).join(', ') || 'UF não informada'}
+              </strong>
+              <span>
+                {run.createdAt ? timeFormat.format(new Date(run.createdAt)) : 'Data indisponível'}
+                {run.status === 'completed' ? ` · ${formatNumber.format(run.foundRows || 0)} empresas encontradas` : ''}
+              </span>
+              {run.status === 'failed' && run.error && <span className="failed">{run.error.slice(0, 180)}</span>}
+            </div>
+          ))}
+        </NotificationPanel>
+      )}
+    </NotificationAnchor>
+  );
+}
 
 const formatNumber = new Intl.NumberFormat('pt-BR');
 const formatPercent = new Intl.NumberFormat('pt-BR', {
@@ -360,7 +453,8 @@ export default function App() {
   const [activePage, setActivePage] = useState('overview');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const isLeadsPage = activePage === 'leads';
+  const isOverviewPage = activePage === 'overview';
+  const pageInfo = pageDetails[activePage] || pageDetails.overview;
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -402,7 +496,7 @@ export default function App() {
           />
         </NavGroup>
         <SidebarBottom>
-          <SidebarLink type="button" disabled title="Central de ajuda disponível em breve">
+          <SidebarLink type="button" onClick={() => setActivePage('help')} title="Abrir central de ajuda">
             <CircleHelp size={17} /> Central de ajuda
           </SidebarLink>
           <div className="user-card">
@@ -416,13 +510,10 @@ export default function App() {
       <Layout>
         <Topbar>
           <div className="breadcrumb">
-            Workspace <span>/</span> <strong>{isLeadsPage ? 'Leads' : 'Visão geral'}</strong>
+            Workspace <span>/</span> <strong>{pageInfo.title}</strong>
           </div>
           <HeaderActions>
-            <IconButton type="button" aria-label="Notificações (indisponível)" disabled title="Disponível em breve">
-              <Bell size={18} />
-              <i />
-            </IconButton>
+            <NotificationsMenu />
             <div className="top-user"><Avatar>LE</Avatar><span>Equipe LeadEngine</span><ChevronDown size={14} /></div>
           </HeaderActions>
         </Topbar>
@@ -431,22 +522,18 @@ export default function App() {
           <Header>
             <div>
               <HeaderEyebrow>
-                {isLeadsPage
-                  ? 'GESTÃO COMERCIAL'
-                  : new Intl.DateTimeFormat('pt-BR', {
+                {isOverviewPage
+                  ? new Intl.DateTimeFormat('pt-BR', {
                       weekday: 'long',
                       day: 'numeric',
                       month: 'long',
-                    }).format(new Date()).toLocaleUpperCase('pt-BR')}
+                    }).format(new Date()).toLocaleUpperCase('pt-BR')
+                  : pageInfo.eyebrow}
               </HeaderEyebrow>
-              <HeaderTitle>{isLeadsPage ? 'Leads' : 'Visão geral'}</HeaderTitle>
-              <SectionSubtitle>
-                {isLeadsPage
-                  ? 'Organize empresas, acompanhe etapas e mantenha sua prospecção em movimento.'
-                  : 'Encontre as melhores oportunidades para o seu time.'}
-              </SectionSubtitle>
+              <HeaderTitle>{pageInfo.title}</HeaderTitle>
+              <SectionSubtitle>{pageSubtitles[activePage]}</SectionSubtitle>
             </div>
-            {!isLeadsPage && (
+            {isOverviewPage && (
               <RefreshButton type="button" onClick={loadDashboard} disabled={loading}>
                 <TrendingUp size={16} className={loading ? 'spinning' : ''} />
                 {loading ? 'Atualizando...' : 'Atualizar painel'}
@@ -454,7 +541,7 @@ export default function App() {
             )}
           </Header>
 
-          {!isLeadsPage && (
+          {isOverviewPage && (
             <DemoNotice>
               <Database size={15} />
               <span>
@@ -464,23 +551,28 @@ export default function App() {
             </DemoNotice>
           )}
 
-          {!isLeadsPage && error && <ErrorBox role="alert">{error}</ErrorBox>}
-          {!isLeadsPage && loading && !dashboard && (
+          {isOverviewPage && error && <ErrorBox role="alert">{error}</ErrorBox>}
+          {isOverviewPage && loading && !dashboard && (
             <LoadingState><LoaderCircle size={20} className="spinning" /> Carregando painel...</LoadingState>
           )}
-          {!isLeadsPage && !loading && !dashboard && !error && (
+          {isOverviewPage && !loading && !dashboard && !error && (
             <ErrorBox role="alert">Nenhum dado disponível para exibição.</ErrorBox>
           )}
 
-          {isLeadsPage && (
+          {activePage === 'leads' && (
             <LeadsPage
               statusCounts={dashboard?.statusCounts}
               onStatusChanged={loadDashboard}
               onNavigateToOverview={() => setActivePage('overview')}
             />
           )}
+          {activePage === 'companies' && <CompaniesPage />}
+          {activePage === 'campaigns' && <CampaignsPage />}
+          {activePage === 'reports' && <ReportsPage />}
+          {activePage === 'settings' && <SettingsPage />}
+          {activePage === 'help' && <HelpPage onNavigate={setActivePage} />}
 
-          {!isLeadsPage && dashboard && (
+          {isOverviewPage && dashboard && (
             <Content>
               <Section>
                 <SectionHeader>

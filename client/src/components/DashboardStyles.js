@@ -132,7 +132,8 @@ export const SidebarLink = styled.button`
   color: #9ba5b2;
   font-size: 12px;
   text-align: left;
-  cursor: not-allowed;
+  cursor: pointer;
+  &:hover { color: #d3c6ff; }
   @media (max-width: 820px) { justify-content: center; font-size: 0; padding-inline: 0; }
 `;
 
@@ -222,7 +223,9 @@ export const IconButton = styled.button`
   border: 0;
   background: transparent;
   color: #9ba5b2;
-  cursor: not-allowed;
+  cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
+  &:hover:not(:disabled) { color: #c4b5fd; }
+  &:disabled { opacity: 0.6; }
   i {
     position: absolute;
     top: 6px;
@@ -230,7 +233,7 @@ export const IconButton = styled.button`
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #f18b76;
+    background: ${({ $failed }) => ($failed ? '#f18b76' : '#6ed6a8')};
     box-shadow: 0 0 0 2px #0e1218;
   }
 `;

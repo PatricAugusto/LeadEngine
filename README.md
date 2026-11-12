@@ -48,6 +48,16 @@ O Vite disponibiliza a interface em `http://localhost:5173` e encaminha chamadas
 - A etapa pode ser atualizada diretamente na lista: novo lead, qualificado, contatado, reunião, cliente ou desqualificado. A alteração é salva no SQLite e refletida nos indicadores do painel.
 - Nenhuma tabela ou migration adicional é necessária; o módulo usa o campo `status` existente em `Prospect`.
 
+## Empresas, campanhas e relatórios
+
+- **Empresas** pesquisa a base ativa por nome, CNPJ, CNAE, município e UF, com paginação.
+- **Campanhas** permite criar grupos de empresas, associar empresas ativas e acompanhar a etapa manualmente. O sistema não envia mensagens nem coleta contatos pessoais.
+- **Relatórios** apresenta indicadores agregados da base, das campanhas e das buscas executadas.
+- **Configurações** concentra o agendamento opcional da busca semanal ou mensal às 03:00 no fuso de Brasília. A busca automática continua desativada por padrão.
+- **Central de ajuda** explica o fluxo e os limites dos dados; as notificações mostram as buscas recentes e eventuais falhas.
+
+As tabelas de campanhas são novas. Para uma instalação existente, revise e aplique **uma única vez** `server/prisma/manual-campaigns.sql` ao SQLite. Para uma instalação nova, use o `server/prisma/manual-schema.sql` completo; não reaplique esse arquivo a um banco já criado. Depois gere novamente o cliente Prisma com `npm run db:generate --workspace server`.
+
 ## Banco de dados
 
 O schema Prisma está em `server/prisma/schema.prisma`. Nenhuma migration é executada automaticamente. Revise e aplique o SQL manual antes de iniciar uma busca; a API informa quando o banco ainda não está preparado.

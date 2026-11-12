@@ -38,6 +38,14 @@ export function validateStates(states) {
   return normalized;
 }
 
+export function validateStateFilter(state) {
+  if (state === undefined || state === '') return undefined;
+  if (typeof state !== 'string' || !stateCodes.has(state.toUpperCase())) {
+    throw new SearchRequestError('O filtro de UF informado é inválido.');
+  }
+  return state.toUpperCase();
+}
+
 async function updateRun(prisma, runId, values) {
   await prisma.searchRun.update({ where: { id: runId }, data: values });
 }

@@ -9,6 +9,17 @@ import {
   updateLeadStatus,
 } from './leads/leadService.js';
 import {
+  CampaignRequestError,
+  addProspectsToCampaign,
+  createCampaign,
+  listCampaignProspects,
+  listCampaigns,
+  removeProspectFromCampaign,
+  updateCampaign,
+  updateCampaignProspect,
+} from './campaigns/campaignService.js';
+import { getReportData } from './reports/reportService.js';
+import {
   configureSchedule,
   getRun,
   getSchedule,
@@ -17,6 +28,7 @@ import {
   recoverInterruptedRuns,
   SearchRequestError,
   startSearch,
+  validateStateFilter,
   validateStates,
 } from './cnpj/searchService.js';
 
@@ -161,12 +173,18 @@ app.get('/api/prospects', asyncRoute(async (request, response) => {
   if (!Number.isSafeInteger(page) || page < 1 || page > 1_000_000) {
     throw new SearchRequestError('O número da página deve ser um inteiro positivo.');
   }
+  const rawPageSize = request.query.pageSize || '10';
+  const pageSize = Number(rawPageSize);
+  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 100) {
+    throw new SearchRequestError('O tamanho da página deve ser entre 1 e 100.');
+  }
 
   const query = String(request.query.q || '').trim();
   if (query.length > 100) {
     throw new SearchRequestError('A busca deve ter no máximo 100 caracteres.');
   }
   const status = parseLeadStatusFilter(request.query.status);
+  const state = validateStateFilter(request.query.state);
   const searchConditions = query
     ? [
         { companyName: { contains: query } },
@@ -182,9 +200,9 @@ app.get('/api/prospects', asyncRoute(async (request, response) => {
   const where = {
     sourceActive: true,
     ...(status ? { status } : {}),
+    ...(state ? { state } : {}),
     ...(searchConditions.length ? { OR: searchConditions } : {}),
   };
-  const pageSize = 10;
   const [total, prospects] = await Promise.all([
     prisma.prospect.count({ where }),
     prisma.prospect.findMany({
@@ -219,6 +237,55 @@ app.get('/api/prospects', asyncRoute(async (request, response) => {
     total,
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
   });
+}));
+
+app.get('/api/reports', asyncRoute(async (_request, response) => {
+  response.set('Cache-Control', 'no-store');
+  response.json(await getReportData(prisma));
+}));
+
+app.get('/api/campaigns', asyncRoute(async (_request, response) => {
+  response.set('Cache-Control', 'no-store');
+  response.json(await listCampaigns(prisma));
+}));
+
+app.post('/api/campaigns', asyncRoute(async (request, response) => {
+  response.status(201).json(await createCampaign(prisma, request.body));
+}));
+
+app.patch('/api/campaigns/:id', asyncRoute(async (request, response) => {
+  response.json(await updateCampaign(prisma, request.params.id, request.body));
+}));
+
+app.get('/api/campaigns/:id/prospects', asyncRoute(async (request, response) => {
+  const rawPage = request.query.page || '1';
+  const page = Number(rawPage);
+  const query = String(request.query.q || '').trim();
+  response.set('Cache-Control', 'no-store');
+  response.json(await listCampaignProspects(prisma, request.params.id, { page, query }));
+}));
+
+app.post('/api/campaigns/:id/prospects', asyncRoute(async (request, response) => {
+  response.status(201).json(
+    await addProspectsToCampaign(prisma, request.params.id, request.body?.prospectIds),
+  );
+}));
+
+app.patch('/api/campaigns/:id/prospects/:prospectId', asyncRoute(async (request, response) => {
+  response.json(
+    await updateCampaignProspect(
+      prisma,
+      request.params.id,
+      request.params.prospectId,
+      request.body?.status,
+    ),
+  );
+}));
+
+app.delete('/api/campaigns/:id/prospects/:prospectId', asyncRoute(async (request, response) => {
+  response.json(
+    await removeProspectFromCampaign(prisma, request.params.id, request.params.prospectId),
+  );
 }));
 
 app.patch('/api/prospects/:id/status', asyncRoute(async (request, response) => {
@@ -270,7 +337,9 @@ app.use((_request, response) => {
 });
 
 app.use((error, _request, response, _next) => {
-  if (error instanceof SearchRequestError || error instanceof LeadRequestError) {
+  if (error instanceof SearchRequestError
+    || error instanceof LeadRequestError
+    || error instanceof CampaignRequestError) {
     response.status(error.statusCode).json({ error: error.message });
     return;
   }

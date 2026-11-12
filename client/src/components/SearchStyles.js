@@ -114,7 +114,6 @@ export const SearchCheckbox = styled.label`
     accent-color: #a78bfa;
   }
   input:disabled { cursor: not-allowed; }
-  &.schedule-toggle { white-space: nowrap; }
 `;
 
 export const SearchActions = styled.div`
@@ -123,32 +122,9 @@ export const SearchActions = styled.div`
   justify-content: space-between;
   gap: 12px;
   margin-top: 14px;
-  .schedule-controls {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 9px;
-  }
-  .schedule-controls > button {
-    display: inline-flex;
-    height: 33px;
-    align-items: center;
-    gap: 6px;
-    border: 1px solid #2a3340;
-    border-radius: 7px;
-    background: #171d27;
-    padding: 0 9px;
-    color: #c4b5fd;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .schedule-controls > button:disabled { cursor: not-allowed; opacity: 0.6; }
-  .save-chevron { display: none; }
   @media (max-width: 760px) {
     align-items: flex-start;
     flex-direction: column;
-    .schedule-controls { flex-wrap: wrap; justify-content: flex-start; }
   }
 `;
 
@@ -170,17 +146,6 @@ export const SearchButton = styled.button`
   transition: background 150ms ease;
   &:hover:not(:disabled) { background: #9a7df5; }
   &:disabled { cursor: not-allowed; opacity: 0.6; }
-`;
-
-export const SearchSelect = styled.select`
-  height: 33px;
-  border: 1px solid #2a3340;
-  border-radius: 7px;
-  background: #171d27;
-  padding: 0 8px;
-  color: #b5bec9;
-  font-size: 11px;
-  &:disabled { cursor: not-allowed; opacity: 0.55; }
 `;
 
 export const SearchStatus = styled.div`

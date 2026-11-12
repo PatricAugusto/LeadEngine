@@ -23,8 +23,14 @@ export function getSearchRun(id) {
   return requestJson(`/api/search-runs/${encodeURIComponent(id)}`);
 }
 
-export function getProspects({ page = 1, query = '', status = '' } = {}) {
-  const params = new URLSearchParams({ page: String(page), q: query, status });
+export function getProspects({ page = 1, pageSize = 10, query = '', status = '', state = '' } = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+    q: query,
+    status,
+    state,
+  });
   return requestJson(`/api/prospects?${params.toString()}`);
 }
 
@@ -50,4 +56,59 @@ export function saveSearchSchedule({ enabled, frequency, states }) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ enabled, frequency, states }),
   });
+}
+
+export function getCampaigns() {
+  return requestJson('/api/campaigns');
+}
+
+export function createCampaign({ name, description }) {
+  return requestJson('/api/campaigns', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description }),
+  });
+}
+
+export function updateCampaign(id, values) {
+  return requestJson(`/api/campaigns/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(values),
+  });
+}
+
+export function getCampaignProspects(id, { page = 1, query = '' } = {}) {
+  const params = new URLSearchParams({ page: String(page), q: query });
+  return requestJson(`/api/campaigns/${encodeURIComponent(id)}/prospects?${params.toString()}`);
+}
+
+export function addCampaignProspects(id, prospectIds) {
+  return requestJson(`/api/campaigns/${encodeURIComponent(id)}/prospects`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prospectIds }),
+  });
+}
+
+export function updateCampaignProspect(campaignId, prospectId, status) {
+  return requestJson(
+    `/api/campaigns/${encodeURIComponent(campaignId)}/prospects/${encodeURIComponent(prospectId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    },
+  );
+}
+
+export function removeCampaignProspect(campaignId, prospectId) {
+  return requestJson(
+    `/api/campaigns/${encodeURIComponent(campaignId)}/prospects/${encodeURIComponent(prospectId)}`,
+    { method: 'DELETE' },
+  );
+}
+
+export function getReports() {
+  return requestJson('/api/reports');
 }

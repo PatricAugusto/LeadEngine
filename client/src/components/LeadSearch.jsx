@@ -1,21 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   AlertCircle,
-  CalendarClock,
   CheckCircle2,
-  ChevronDown,
   Database,
   LoaderCircle,
   Play,
-  Save,
 } from 'lucide-react';
-import {
-  getSearchRun,
-  getSearchRuns,
-  getSearchSchedule,
-  saveSearchSchedule,
-  startSearch,
-} from '../api.js';
+import { getSearchRun, getSearchRuns, startSearch } from '../api.js';
+import { allStateCodes, states } from '../data/states.js';
 import {
   SearchActions,
   SearchButton,
@@ -27,22 +19,11 @@ import {
   SearchProgress,
   SearchProgressTrack,
   SearchSection,
-  SearchSelect,
   SearchStatus,
   SearchStatusLine,
   StateGrid,
 } from './SearchStyles.js';
 
-const states = [
-  ['AC', 'Acre'], ['AL', 'Alagoas'], ['AP', 'Amapá'], ['AM', 'Amazonas'],
-  ['BA', 'Bahia'], ['CE', 'Ceará'], ['DF', 'Distrito Federal'], ['ES', 'Espírito Santo'],
-  ['GO', 'Goiás'], ['MA', 'Maranhão'], ['MT', 'Mato Grosso'], ['MS', 'Mato Grosso do Sul'],
-  ['MG', 'Minas Gerais'], ['PA', 'Pará'], ['PB', 'Paraíba'], ['PR', 'Paraná'],
-  ['PE', 'Pernambuco'], ['PI', 'Piauí'], ['RJ', 'Rio de Janeiro'], ['RN', 'Rio Grande do Norte'],
-  ['RS', 'Rio Grande do Sul'], ['RO', 'Rondônia'], ['RR', 'Roraima'], ['SC', 'Santa Catarina'],
-  ['SP', 'São Paulo'], ['SE', 'Sergipe'], ['TO', 'Tocantins'],
-];
-const allStateCodes = states.map(([code]) => code);
 const numberFormat = new Intl.NumberFormat('pt-BR');
 const stepLabels = {
   queued: 'Na fila',
@@ -120,35 +101,25 @@ function SearchRunStatus({ run }) {
 
 export default function LeadSearch({ onCompleted }) {
   const [selectedStates, setSelectedStates] = useState(allStateCodes);
-  const [frequency, setFrequency] = useState('monthly');
-  const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [run, setRun] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [savingSchedule, setSavingSchedule] = useState(false);
-  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [loadingRuns, setLoadingRuns] = useState(true);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
 
-  const selectedLabel = useMemo(
-    () => `${selectedStates.length} ${selectedStates.length === 1 ? 'UF selecionada' : 'UFs selecionadas'}`,
-    [selectedStates.length],
-  );
+  const selectedLabel = `${selectedStates.length} ${selectedStates.length === 1 ? 'UF selecionada' : 'UFs selecionadas'}`;
 
   useEffect(() => {
     let active = true;
-    Promise.all([getSearchSchedule(), getSearchRuns()])
-      .then(([schedule, runs]) => {
+    getSearchRuns()
+      .then((runs) => {
         if (!active) return;
-        setScheduleEnabled(schedule.enabled);
-        setFrequency(schedule.frequency);
-        if (schedule.states.length) setSelectedStates(schedule.states);
         if (runs.length) setRun(runs[0]);
       })
       .catch((loadError) => {
         if (active) setError(loadError.message);
       })
       .finally(() => {
-        if (active) setLoadingSettings(false);
+        if (active) setLoadingRuns(false);
       });
     return () => { active = false; };
   }, []);
@@ -169,7 +140,6 @@ export default function LeadSearch({ onCompleted }) {
 
   const handleSearch = useCallback(async () => {
     setError('');
-    setNotice('');
     setLoading(true);
     try {
       const newRun = await startSearch(selectedStates);
@@ -180,27 +150,6 @@ export default function LeadSearch({ onCompleted }) {
       setLoading(false);
     }
   }, [selectedStates]);
-
-  const handleSchedule = useCallback(async () => {
-    setError('');
-    setNotice('');
-    setSavingSchedule(true);
-    try {
-      const schedule = await saveSearchSchedule({
-        enabled: scheduleEnabled,
-        frequency,
-        states: selectedStates,
-      });
-      setScheduleEnabled(schedule.enabled);
-      setNotice(schedule.enabled
-        ? `Busca ${frequency === 'weekly' ? 'semanal' : 'mensal'} agendada para ${selectedLabel.toLocaleLowerCase('pt-BR')}.`
-        : 'Agendamento desativado.');
-    } catch (scheduleError) {
-      setError(scheduleError.message);
-    } finally {
-      setSavingSchedule(false);
-    }
-  }, [frequency, scheduleEnabled, selectedLabel, selectedStates]);
 
   return (
     <SearchSection>
@@ -227,42 +176,15 @@ export default function LeadSearch({ onCompleted }) {
         </SearchField>
 
         <SearchActions>
-          <SearchButton type="button" onClick={handleSearch} disabled={loading || loadingSettings || !selectedStates.length || isActiveRun(run)}>
+          <SearchButton type="button" onClick={handleSearch} disabled={loading || loadingRuns || !selectedStates.length || isActiveRun(run)}>
             {loading || isActiveRun(run)
               ? <LoaderCircle size={16} className="spinning" />
               : <Play size={16} />}
             {loading || isActiveRun(run) ? 'Busca em andamento' : 'Iniciar busca'}
           </SearchButton>
-          <div className="schedule-controls">
-            <SearchCheckbox className="schedule-toggle">
-              <input
-                type="checkbox"
-                checked={scheduleEnabled}
-                onChange={(event) => setScheduleEnabled(event.target.checked)}
-                disabled={loadingSettings || savingSchedule}
-              />
-              <CalendarClock size={16} />
-              <span>Agendar automaticamente</span>
-            </SearchCheckbox>
-            <SearchSelect
-              value={frequency}
-              onChange={(event) => setFrequency(event.target.value)}
-              disabled={!scheduleEnabled || loadingSettings || savingSchedule}
-              aria-label="Frequência da busca agendada"
-            >
-              <option value="weekly">Semanal</option>
-              <option value="monthly">Mensal</option>
-            </SearchSelect>
-            <button type="button" onClick={handleSchedule} disabled={loadingSettings || savingSchedule}>
-              {savingSchedule ? <LoaderCircle size={15} className="spinning" /> : <Save size={15} />}
-              Salvar
-              <ChevronDown size={13} className="save-chevron" />
-            </button>
-          </div>
         </SearchActions>
 
         {error && <SearchStatus $state="error" role="alert"><AlertCircle size={16} /><span>{error}</span></SearchStatus>}
-        {notice && <SearchStatus $state="success" role="status"><CheckCircle2 size={16} /><span>{notice}</span></SearchStatus>}
         <SearchRunStatus run={run} />
       </SearchCard>
     </SearchSection>

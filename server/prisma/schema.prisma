@@ -25,6 +25,8 @@ model Prospect {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  campaignMemberships CampaignProspect[]
+
   @@index([state, status])
   @@index([state, cnaePrimary])
   @@index([companyName])
@@ -53,4 +55,31 @@ model SearchSchedule {
   cronExpression String   @default("0 3 1 * *")
   statesJson     String   @default("[]")
   updatedAt      DateTime @updatedAt
+}
+
+model Campaign {
+  id          String             @id @default(cuid())
+  name        String
+  description String?
+  status      String             @default("draft")
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  prospects   CampaignProspect[]
+
+  @@index([status, updatedAt])
+}
+
+model CampaignProspect {
+  id         String   @id @default(cuid())
+  campaignId String
+  prospectId String
+  status     String   @default("pending")
+  addedAt    DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  prospect   Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, prospectId])
+  @@index([prospectId])
+  @@index([campaignId, status])
 }
