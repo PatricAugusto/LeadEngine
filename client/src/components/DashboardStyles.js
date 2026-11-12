@@ -682,13 +682,21 @@ export const Tag = styled.span`
   color: #aeb7c2;
   font-size: 10px;
 `;
+const badgeTones = {
+  new: { background: '#34291d', color: '#e8b66f' },
+  qualified: { background: '#173329', color: '#7bd2ad' },
+  contacted: { background: '#1b2b40', color: '#8bb8ef' },
+  meeting: { background: '#27213a', color: '#b7a3ff' },
+  customer: { background: '#173329', color: '#7bd2ad' },
+  disqualified: { background: '#302329', color: '#e1a0aa' },
+};
 export const Badge = styled.span`
   display: inline-flex;
   align-items: center;
   border-radius: 5px;
-  background: ${({ $status }) => ($status === 'qualified' ? '#173329' : $status === 'contacted' ? '#1b2b40' : '#34291d')};
+  background: ${({ $status }) => badgeTones[$status]?.background || '#1b2330'};
   padding: 5px 8px;
-  color: ${({ $status }) => ($status === 'qualified' ? '#7bd2ad' : $status === 'contacted' ? '#8bb8ef' : '#e8b66f')};
+  color: ${({ $status }) => badgeTones[$status]?.color || '#aeb7c2'};
   font-size: 10px;
   font-weight: 650;
 `;

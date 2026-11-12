@@ -42,6 +42,12 @@ O Vite disponibiliza a interface em `http://localhost:5173` e encaminha chamadas
 - O agendamento é opt-in, desativado por padrão. Pode ser semanal ou mensal às 03:00 no fuso de Brasília. O servidor não inicia uma busca automaticamente ao subir; uma execução agendada só ocorre quando habilitada no painel.
 - A base guarda dados cadastrais empresariais. Não coletamos contatos pessoais, e-mails ou telefones nesta etapa. A pontuação inicial é zero e não representa uma avaliação automática de potencial.
 
+## Gestão de leads
+
+- O módulo **Leads** lista empresas ativas da base, com busca por empresa, CNPJ, CNAE ou cidade, filtros por etapa e paginação.
+- A etapa pode ser atualizada diretamente na lista: novo lead, qualificado, contatado, reunião, cliente ou desqualificado. A alteração é salva no SQLite e refletida nos indicadores do painel.
+- Nenhuma tabela ou migration adicional é necessária; o módulo usa o campo `status` existente em `Prospect`.
+
 ## Banco de dados
 
 O schema Prisma está em `server/prisma/schema.prisma`. Nenhuma migration é executada automaticamente. Revise e aplique o SQL manual antes de iniciar uma busca; a API informa quando o banco ainda não está preparado.

@@ -3,6 +3,12 @@ import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { fileURLToPath } from 'node:url';
 import {
+  LeadRequestError,
+  leadStatusLabels,
+  parseLeadStatusFilter,
+  updateLeadStatus,
+} from './leads/leadService.js';
+import {
   configureSchedule,
   getRun,
   getSchedule,
@@ -28,17 +34,6 @@ function asyncRoute(handler) {
   return (request, response, next) => {
     Promise.resolve(handler(request, response, next)).catch(next);
   };
-}
-
-function statusLabel(status) {
-  return {
-    new: 'Novo lead',
-    qualified: 'Qualificado',
-    contacted: 'Contatado',
-    meeting: 'Reunião',
-    customer: 'Cliente',
-    disqualified: 'Desqualificado',
-  }[status] || status;
 }
 
 function calendarDays(days) {
@@ -152,6 +147,9 @@ app.get('/api/dashboard', asyncRoute(async (_request, response) => {
       customers,
       conversion: activeProspects ? Number(((customers / activeProspects) * 100).toFixed(1)) : 0,
     },
+    statusCounts: Object.fromEntries(
+      statusGroups.map((group) => [group.status, group._count._all]),
+    ),
     activity,
     funnel: stages,
   });
@@ -168,6 +166,7 @@ app.get('/api/prospects', asyncRoute(async (request, response) => {
   if (query.length > 100) {
     throw new SearchRequestError('A busca deve ter no máximo 100 caracteres.');
   }
+  const status = parseLeadStatusFilter(request.query.status);
   const searchConditions = query
     ? [
         { companyName: { contains: query } },
@@ -182,6 +181,7 @@ app.get('/api/prospects', asyncRoute(async (request, response) => {
   if (cnpjDigits) searchConditions.push({ cnpj: { contains: cnpjDigits } });
   const where = {
     sourceActive: true,
+    ...(status ? { status } : {}),
     ...(searchConditions.length ? { OR: searchConditions } : {}),
   };
   const pageSize = 10;
@@ -212,13 +212,17 @@ app.get('/api/prospects', asyncRoute(async (request, response) => {
   response.json({
     items: prospects.map((prospect) => ({
       ...prospect,
-      statusLabel: statusLabel(prospect.status),
+      statusLabel: leadStatusLabels[prospect.status] || prospect.status,
     })),
     page,
     pageSize,
     total,
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
   });
+}));
+
+app.patch('/api/prospects/:id/status', asyncRoute(async (request, response) => {
+  response.json(await updateLeadStatus(prisma, request.params.id, request.body?.status));
 }));
 
 app.post('/api/search', asyncRoute(async (request, response) => {
@@ -266,7 +270,7 @@ app.use((_request, response) => {
 });
 
 app.use((error, _request, response, _next) => {
-  if (error instanceof SearchRequestError) {
+  if (error instanceof SearchRequestError || error instanceof LeadRequestError) {
     response.status(error.statusCode).json({ error: error.message });
     return;
   }

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { getDashboard, getProspects } from './api.js';
 import LeadSearch from './components/LeadSearch.jsx';
+import LeadsPage from './components/LeadsPage.jsx';
 import {
   ActivityBars,
   ActivityCard,
@@ -95,8 +96,8 @@ import {
 } from './components/DashboardStyles.js';
 
 const navigation = [
-  { label: 'Visão geral', icon: LayoutDashboard, active: true },
-  { label: 'Leads', icon: Users },
+  { label: 'Visão geral', icon: LayoutDashboard, page: 'overview' },
+  { label: 'Leads', icon: Users, page: 'leads' },
   { label: 'Empresas', icon: Building2 },
   { label: 'Campanhas', icon: Megaphone },
 ];
@@ -148,23 +149,28 @@ function Metric({ icon: Icon, label, value, detail, tone }) {
   );
 }
 
-function SidebarNavigation({ items }) {
+function SidebarNavigation({ items, currentPage, onNavigate }) {
   return (
     <NavList>
-      {items.map(({ label, icon: Icon, active }) => (
-        <NavItem
-          key={label}
-          type="button"
-          $active={Boolean(active)}
-          disabled={!active}
-          title={active ? label : `${label} — disponível em breve`}
-          aria-current={active ? 'page' : undefined}
-        >
-          <Icon size={18} />
-          <span>{label}</span>
-          {!active && <span className="soon">Em breve</span>}
-        </NavItem>
-      ))}
+      {items.map(({ label, icon: Icon, page }) => {
+        const active = page === currentPage;
+        const disabled = !page;
+        return (
+          <NavItem
+            key={label}
+            type="button"
+            $active={active}
+            disabled={disabled}
+            onClick={() => page && onNavigate(page)}
+            title={disabled ? `${label} — disponível em breve` : label}
+            aria-current={active ? 'page' : undefined}
+          >
+            <Icon size={18} />
+            <span>{label}</span>
+            {disabled && <span className="soon">Em breve</span>}
+          </NavItem>
+        );
+      })}
     </NavList>
   );
 }
@@ -351,8 +357,10 @@ function ActivityPanel({ activity }) {
 
 export default function App() {
   const [dashboard, setDashboard] = useState(null);
+  const [activePage, setActivePage] = useState('overview');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const isLeadsPage = activePage === 'leads';
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -379,11 +387,19 @@ export default function App() {
         </Brand>
         <NavGroup>
           <NavSectionLabel>MENU PRINCIPAL</NavSectionLabel>
-          <SidebarNavigation items={navigation} />
+          <SidebarNavigation
+            items={navigation}
+            currentPage={activePage}
+            onNavigate={setActivePage}
+          />
         </NavGroup>
         <NavGroup>
           <NavSectionLabel>GESTÃO</NavSectionLabel>
-          <SidebarNavigation items={secondaryNavigation} />
+          <SidebarNavigation
+            items={secondaryNavigation}
+            currentPage={activePage}
+            onNavigate={setActivePage}
+          />
         </NavGroup>
         <SidebarBottom>
           <SidebarLink type="button" disabled title="Central de ajuda disponível em breve">
@@ -399,7 +415,9 @@ export default function App() {
 
       <Layout>
         <Topbar>
-          <div className="breadcrumb">Workspace <span>/</span> <strong>Visão geral</strong></div>
+          <div className="breadcrumb">
+            Workspace <span>/</span> <strong>{isLeadsPage ? 'Leads' : 'Visão geral'}</strong>
+          </div>
           <HeaderActions>
             <IconButton type="button" aria-label="Notificações (indisponível)" disabled title="Disponível em breve">
               <Bell size={18} />
@@ -413,36 +431,56 @@ export default function App() {
           <Header>
             <div>
               <HeaderEyebrow>
-                  {new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
-                  .format(new Date())
-                  .toLocaleUpperCase('pt-BR')}
+                {isLeadsPage
+                  ? 'GESTÃO COMERCIAL'
+                  : new Intl.DateTimeFormat('pt-BR', {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long',
+                    }).format(new Date()).toLocaleUpperCase('pt-BR')}
               </HeaderEyebrow>
-              <HeaderTitle>Visão geral</HeaderTitle>
-              <SectionSubtitle>Encontre as melhores oportunidades para o seu time.</SectionSubtitle>
+              <HeaderTitle>{isLeadsPage ? 'Leads' : 'Visão geral'}</HeaderTitle>
+              <SectionSubtitle>
+                {isLeadsPage
+                  ? 'Organize empresas, acompanhe etapas e mantenha sua prospecção em movimento.'
+                  : 'Encontre as melhores oportunidades para o seu time.'}
+              </SectionSubtitle>
             </div>
-            <RefreshButton type="button" onClick={loadDashboard} disabled={loading}>
-              <TrendingUp size={16} className={loading ? 'spinning' : ''} />
-              {loading ? 'Atualizando...' : 'Atualizar painel'}
-            </RefreshButton>
+            {!isLeadsPage && (
+              <RefreshButton type="button" onClick={loadDashboard} disabled={loading}>
+                <TrendingUp size={16} className={loading ? 'spinning' : ''} />
+                {loading ? 'Atualizando...' : 'Atualizar painel'}
+              </RefreshButton>
+            )}
           </Header>
 
-          <DemoNotice>
-            <Database size={15} />
-            <span>
-              Fonte: {dashboard?.source || 'Dados Abertos do CNPJ — Receita Federal'}.
-              {' '}Somente dados cadastrais empresariais; não coletamos dados pessoais nesta etapa.
-            </span>
-          </DemoNotice>
+          {!isLeadsPage && (
+            <DemoNotice>
+              <Database size={15} />
+              <span>
+                Fonte: {dashboard?.source || 'Dados Abertos do CNPJ — Receita Federal'}.
+                {' '}Somente dados cadastrais empresariais; não coletamos dados pessoais nesta etapa.
+              </span>
+            </DemoNotice>
+          )}
 
-          {error && <ErrorBox role="alert">{error}</ErrorBox>}
-          {loading && !dashboard && (
+          {!isLeadsPage && error && <ErrorBox role="alert">{error}</ErrorBox>}
+          {!isLeadsPage && loading && !dashboard && (
             <LoadingState><LoaderCircle size={20} className="spinning" /> Carregando painel...</LoadingState>
           )}
-          {!loading && !dashboard && !error && (
+          {!isLeadsPage && !loading && !dashboard && !error && (
             <ErrorBox role="alert">Nenhum dado disponível para exibição.</ErrorBox>
           )}
 
-          {dashboard && (
+          {isLeadsPage && (
+            <LeadsPage
+              statusCounts={dashboard?.statusCounts}
+              onStatusChanged={loadDashboard}
+              onNavigateToOverview={() => setActivePage('overview')}
+            />
+          )}
+
+          {!isLeadsPage && dashboard && (
             <Content>
               <Section>
                 <SectionHeader>

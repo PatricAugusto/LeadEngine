@@ -23,9 +23,17 @@ export function getSearchRun(id) {
   return requestJson(`/api/search-runs/${encodeURIComponent(id)}`);
 }
 
-export function getProspects({ page = 1, query = '' } = {}) {
-  const params = new URLSearchParams({ page: String(page), q: query });
+export function getProspects({ page = 1, query = '', status = '' } = {}) {
+  const params = new URLSearchParams({ page: String(page), q: query, status });
   return requestJson(`/api/prospects?${params.toString()}`);
+}
+
+export function updateProspectStatus(id, status) {
+  return requestJson(`/api/prospects/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
 }
 
 export function startSearch(states) {
