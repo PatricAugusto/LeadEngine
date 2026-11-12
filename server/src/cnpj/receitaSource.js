@@ -43,7 +43,21 @@ async function request(url, timeoutMs, description) {
   try {
     response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
   } catch (error) {
-    throw new Error(`${description}: ${error instanceof Error ? error.message : String(error)}`);
+    const cause = error instanceof Error ? error.cause : undefined;
+    const causeCode = cause && typeof cause === 'object' && 'code' in cause
+      ? cause.code
+      : undefined;
+    const host = new URL(url).hostname;
+    const isTimeout = causeCode === 'UND_ERR_CONNECT_TIMEOUT'
+      || causeCode === 'ETIMEDOUT'
+      || (error instanceof Error && error.name === 'TimeoutError');
+    const failure = isTimeout
+      ? `a conexão expirou${causeCode ? ` (${causeCode})` : ''}`
+      : `falha de rede${causeCode ? ` (${causeCode})` : ''}`;
+    throw new Error(
+      `${description}: ${failure} ao acessar ${host}. Verifique internet, DNS, firewall/proxy e acesso HTTPS de saída (porta 443).`,
+      { cause: error },
+    );
   }
 
   if (!response.ok) {
