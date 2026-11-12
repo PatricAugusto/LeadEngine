@@ -1,6 +1,7 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
+import { fileURLToPath } from 'node:url';
 import {
   configureSchedule,
   getRun,
@@ -13,9 +14,12 @@ import {
   validateStates,
 } from './cnpj/searchService.js';
 
+dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
+
 const app = express();
 const prisma = new PrismaClient();
 const port = Number(process.env.PORT || 3001);
+const databaseConfigError = 'DATABASE_URL não configurada. Copie server/.env.example para server/.env e reinicie a API.';
 
 app.disable('x-powered-by');
 app.use(express.json({ limit: '16kb' }));
@@ -48,6 +52,15 @@ function calendarDays(days) {
 }
 
 app.get('/api/health', asyncRoute(async (_request, response) => {
+  if (!process.env.DATABASE_URL) {
+    response.status(503).json({
+      status: 'unavailable',
+      database: 'not_configured',
+      error: databaseConfigError,
+    });
+    return;
+  }
+
   try {
     await prisma.$queryRaw`SELECT 1`;
     await prisma.prospect.count();
@@ -257,6 +270,10 @@ app.use((error, _request, response, _next) => {
     response.status(error.statusCode).json({ error: error.message });
     return;
   }
+  if (!process.env.DATABASE_URL) {
+    response.status(503).json({ error: databaseConfigError });
+    return;
+  }
   console.error(`Erro na API: ${error instanceof Error ? error.message : String(error)}`);
   if (error?.code === 'P2021' || error?.code === 'P2022') {
     response.status(503).json({
@@ -269,6 +286,11 @@ app.use((error, _request, response, _next) => {
 
 const server = app.listen(port, '127.0.0.1', () => {
   console.log(`LeadEngine API disponível em http://127.0.0.1:${port}`);
+  if (!process.env.DATABASE_URL) {
+    console.error(databaseConfigError);
+    return;
+  }
+
   recoverInterruptedRuns(prisma)
     .then((count) => {
       if (count) console.warn(`${count} busca(s) interrompida(s) foram marcadas como falha.`);

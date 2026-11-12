@@ -45,6 +45,8 @@ O Vite disponibiliza a interface em `http://localhost:5173` e encaminha chamadas
 
 O schema Prisma está em `server/prisma/schema.prisma`. Nenhuma migration é executada automaticamente. Revise e aplique o SQL manual antes de iniciar uma busca; a API informa quando o banco ainda não está preparado.
 
+O servidor carrega a configuração de `server/.env`, independentemente do diretório de onde for iniciado. Se `DATABASE_URL` estiver ausente, a API permanece indisponível para operações de banco e informa que é necessário copiar `server/.env.example` para `server/.env`.
+
 Para validar o schema sem criar tabelas:
 
 ```powershell
