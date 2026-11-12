@@ -417,7 +417,7 @@ export default function App() {
                   .format(new Date())
                   .toLocaleUpperCase('pt-BR')}
               </HeaderEyebrow>
-              <HeaderTitle>Visão geral <span>👋</span></HeaderTitle>
+              <HeaderTitle>Visão geral</HeaderTitle>
               <SectionSubtitle>Encontre as melhores oportunidades para o seu time.</SectionSubtitle>
             </div>
             <RefreshButton type="button" onClick={loadDashboard} disabled={loading}>
